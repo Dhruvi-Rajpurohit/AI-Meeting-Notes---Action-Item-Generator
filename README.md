@@ -15,7 +15,7 @@ The application is engineered with a strict separation of concerns between the u
 
 [User Browser] ──(HTTP/JSON)──> [FastAPI Backend] ──(API Calls)──> [Groq LLM Engine]
 │                                │
-└────────(File Upload)───────────┼───(Store Metadata)──> [MongoDB Atlas]
+└────────(File Upload)───────────┼───(Store Metadata)──> [MongoDB]
 
 ## 🛠️ Deep Tech Stack
 
@@ -25,7 +25,7 @@ The application is engineered with a strict separation of concerns between the u
 * **Document Processing:** PyPDF2 / pdfplumber — For robust structural layout analysis and text stream parsing from unstructured binaries.
 
 ### Database & Security
-* **Database:** MongoDB Atlas — Handles schema-less storage for polymorphic analytical data structures.
+* **Database:** MongoDB  — Handles schema-less storage for polymorphic analytical data structures.
 * **Environment Security:** `python-dotenv` — Enforces strict runtime configuration isolation, keeping security keys out of version control.
 
 ### Frontend
