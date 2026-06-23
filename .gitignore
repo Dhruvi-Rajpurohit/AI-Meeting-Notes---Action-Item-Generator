@@ -1,5 +1,5 @@
 # Python build artifacts
-**/__pycache__/
+__pycache__
 *.pyc
 backend/.env
 
