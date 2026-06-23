@@ -10,10 +10,12 @@ import time
 import io
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 app = FastAPI(title="Transcript-to-Summary Backend")
 
+# Ensure complete cross-origin coverage so frontend requests don't freeze silently
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,6 +29,7 @@ if not GROQ_API_KEY:
     raise ValueError("CRITICAL ERROR: GROQ_API_KEY is missing from your environment setup.")
 client = Groq(api_key=GROQ_API_KEY)
 
+# Connected securely to your exact Compass configuration
 mongo_client = pymongo.MongoClient("mongodb://localhost:27017")
 db = mongo_client["MeetingIntelligence_ReactPython"]
 users_col = db["Users"]
@@ -40,6 +43,15 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    context_summary: str
+    history: list[ChatMessage]
+    user_message: str
 
 def hash_secret(password_str):
     return hashlib.sha256(password_str.encode()).hexdigest()
@@ -63,16 +75,10 @@ def call_groq_api(prompt_payload: str, json_mode=False):
             time.sleep(2)
 
 def run_ai_document_metadata_pipeline(sample_text: str, current_mode: str):
-    """
-    AI Component: Reads document fragments to predict structure, overall layout tone, 
-    and identify crucial named entities/keywords.
-    """
     snippet = " ".join(sample_text.split()[:1200])
     meta_prompt = (
         "Analyze this text snippet and return a strict JSON object with three keys: "
-        "'detected_type' (string, e.g. Corporate Meeting, Software Log, Contract, Essay), "
-        "'document_tone' (string, e.g. Urgent, Professional, Casual, Analytical), and "
-        "'extracted_entities' (list of strings, max 5 highly vital names, places, tech terms, or topics mentioned).\n\n"
+        "'detected_type', 'document_tone', and 'extracted_entities' (max 5 vital items).\n\n"
         f"Snippet text:\n{snippet}"
     )
     try:
@@ -89,7 +95,6 @@ def run_ai_document_metadata_pipeline(sample_text: str, current_mode: str):
 def generate_advanced_summary(text_content: str, processing_mode: str, detected_type: str):
     words = text_content.split()
     max_chunk_words = 2000 
-    
     chosen_style = detected_type if processing_mode == "Auto-Detect" else processing_mode
     
     if "Audit" in chosen_style or "Log" in chosen_style:
@@ -126,20 +131,60 @@ def generate_advanced_summary(text_content: str, processing_mode: str, detected_
     return call_groq_api(final_prompt)
 
 
+# =====================================================================
+# AUTHENTICATION MODULE (WITH DESCRIPTIVE ERROR STRINGS)
+# =====================================================================
+
 @app.post("/api/register")
 def register(data: UserRegister):
     username_clean = data.username.strip()
-    if users_col.find_one({"username": username_clean}):
-        raise HTTPException(status_code=400, detail="Username taken.")
-    users_col.insert_one({"username": username_clean, "email": data.email.strip(), "password": hash_secret(data.password)})
-    return {"message": "Success"}
+    email_clean = data.email.strip()
+    
+    # Validation checks to prevent empty inputs freezing your forms
+    if not username_clean:
+        raise HTTPException(status_code=400, detail="Validation Error: Username cannot be left empty.")
+    if not email_clean or "@" not in email_clean:
+        raise HTTPException(status_code=400, detail="Validation Error: A valid email address is required.")
+    if len(data.password.strip()) < 4:
+        raise HTTPException(status_code=400, detail="Validation Error: Password must be at least 4 characters long.")
+
+    try:
+        if users_col.find_one({"username": username_clean}):
+            raise HTTPException(status_code=400, detail="Registration Refused: This username is already registered.")
+            
+        if users_col.find_one({"email": email_clean}):
+            raise HTTPException(status_code=400, detail="Registration Refused: This email is already associated with an account.")
+
+        users_col.insert_one({
+            "username": username_clean, 
+            "email": email_clean, 
+            "password": hash_secret(data.password)
+        })
+        return {"message": "Success"}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database Server Error: Unable to record user. ({str(e)})")
+
 
 @app.post("/api/login")
 def login(data: UserLogin):
-    user = users_col.find_one({"username": data.username.strip()})
-    if user and user["password"] == hash_secret(data.password):
-        return {"username": user["username"]}
-    raise HTTPException(status_code=401, detail="Invalid credentials.")
+    u_clean = data.username.strip()
+    if not u_clean or not data.password.strip():
+        raise HTTPException(status_code=400, detail="Validation Error: All credentials fields must be supplied.")
+
+    try:
+        user = users_col.find_one({"username": u_clean})
+        if user and user["password"] == hash_secret(data.password):
+            return {"username": user["username"]}
+        raise HTTPException(status_code=401, detail="Authentication Failure: Incorrect username or password combination.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database Server Connection Drop: {str(e)}")
+
+
+# =====================================================================
+# CORE DOCUMENT PROCESSING WORKFLOW
+# =====================================================================
 
 @app.post("/api/process")
 async def process_document(
@@ -165,14 +210,14 @@ async def process_document(
                 final_text = "\n".join(extracted_pages)
                 
                 if not final_text.strip():
-                    raise HTTPException(status_code=400, detail="This PDF appears to be a scanned image or photocopy without readable text lines.")
+                    raise HTTPException(status_code=400, detail="Processing Error: This PDF file contains no digital text components (scanned image error).")
             else:
                 final_text = file_content.decode("utf-8", errors="ignore")
         elif text:
             final_text = text
             
         if not final_text.strip():
-            raise HTTPException(status_code=400, detail="Input is completely empty.")
+            raise HTTPException(status_code=400, detail="Processing Error: Submitted processing pipeline input data was empty.")
 
         payload_hash = hashlib.sha256(final_text.encode("utf-8", errors="ignore")).hexdigest()
         cached_instance = summaries_col.find_one({"owner": username, "file_hash": payload_hash, "processing_mode": processing_mode})
@@ -190,14 +235,11 @@ async def process_document(
             }
 
         start_time = time.perf_counter()
-        
-        # Pipeline execution 
         detected_type, document_tone, extracted_entities = run_ai_document_metadata_pipeline(final_text, processing_mode)
         ai_response = generate_advanced_summary(final_text, processing_mode, detected_type)
-        
         end_time = time.perf_counter()
-        elapsed_time = round(end_time - start_time, 2)
         
+        elapsed_time = round(end_time - start_time, 2)
         input_len = len(final_text.split()) if len(final_text.split()) > 0 else 1
         output_len = len(ai_response.split())
         compression_ratio = max(0, min(99, round(((input_len - output_len) / input_len) * 100)))
@@ -219,10 +261,42 @@ async def process_document(
     except HTTPException as he:
         raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis pipeline crash details: {str(e)}")
+
+
+# =====================================================================
+# INTERACTIVE CHATBOT ENGINE & HISTORY ROUTING
+# =====================================================================
+
+@app.post("/api/chat")
+def chat_with_summary(payload: ChatRequest):
+    try:
+        system_prompt = (
+            f"You are an assistant analyzing a document summary. "
+            f"Context Summary:\n{payload.context_summary}\n"
+            f"Answer user queries precisely using this data."
+        )
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in payload.history[-6:]:
+            messages.append({"role": msg.role, "content": msg.content})
+        messages.append({"role": "user", "content": payload.user_message})
+        
+        completion = client.chat.completions.create(
+            messages=messages, model="llama-3.3-70b-versatile", timeout=15.0
+        )
+        return {"response": completion.choices[0].message.content}
+    except Exception as e:
+        return {"response": f"Chat pipeline error description: {str(e)}"}
 
 @app.get("/api/history/{username}")
 def get_history(username: str):
-    if username == "Guest_User": return {"history": []}
-    return {"history": list(summaries_col.find({"owner": username.strip()}, {"_id": 0}))}
+    if username == "Guest_User" or username == "Guest": 
+        return {"history": []}
+    try:
+        return {"history": list(summaries_col.find({"owner": username.strip()}, {"_id": 0}))}
+    except:
+        return {"history": []}
 
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main1.py:app", host="127.0.0.1", port=8000, reload=True)
