@@ -284,7 +284,38 @@ function App() {
       if (line.startsWith('### ')) {
         return <h3 key={index} style={{ color: theme.title, marginTop: '18px', marginBottom: '8px', fontSize: '16px', fontWeight: '700' }}>{line.replace('### ', '')}</h3>;
       } else if (line.startsWith('- ')) {
-        return <li key={index} style={{ marginLeft: '16px', marginBottom: '6px', listStyleType: 'disc', fontSize: '14px', lineHeight: '1.5' }}>{line.replace('- ', '')}</li>;
+        let bulletText = line.replace('- ', '');
+        
+        // CHECK IF BULLET LINE CONTAINS A PREDICTED DEADLINE TAG [Due: ...]
+        const dueRegex = /\[Due:\s*([^\]]+)\]/;
+        const match = bulletText.match(dueRegex);
+        
+        if (match) {
+          const deadlineText = match[1];
+          const cleanText = bulletText.replace(dueRegex, '').trim();
+          
+          return (
+            <li key={index} style={{ marginLeft: '16px', marginBottom: '8px', listStyleType: 'disc', fontSize: '14px', lineHeight: '1.5', color: theme.text }}>
+              <span>{cleanText}</span>
+              <span style={{
+                marginLeft: '8px',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                color: '#ef4444',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                display: 'inline-block',
+                verticalAlign: 'middle'
+              }}>
+                ⏳ Deadline: {deadlineText}
+              </span>
+            </li>
+          );
+        }
+
+        return <li key={index} style={{ marginLeft: '16px', marginBottom: '6px', listStyleType: 'disc', fontSize: '14px', lineHeight: '1.5' }}>{bulletText}</li>;
       }
       return line.trim() ? <p key={index} style={{ marginBottom: '8px', lineHeight: '1.5', fontSize: '14px' }}>{line}</p> : <div key={index} style={{ height: '6px' }} />;
     });
@@ -387,9 +418,6 @@ function App() {
                     </div>
                   )}
 
-                  {/* ========================================================== */}
-                  {/* FEATURE DISPLAY: VISUAL SPEAKER TRACKING METERS            */}
-                  {/* ========================================================== */}
                   {summaryOutput && !isProcessing && speakerDistribution.length > 0 && (
                     <div style={{ marginBottom: '16px', background: isDarkMode ? '#1e293b' : '#f1f5f9', padding: '12px', borderRadius: '6px', border: `1px solid ${theme.border}` }}>
                       <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', color: theme.title, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>👥 Meeting Speaker Contribution:</h4>
