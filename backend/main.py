@@ -129,7 +129,9 @@ def generate_advanced_summary(text_content: str, processing_mode: str, detected_
         "Format your answer using exactly these identical clean headers:\n"
         "### Overview\n(Write a clear paragraph here)\n\n"
         "### Key Points\n- Point one\n- Point two\n\n"
-        "### Identified Tasks\n- Task detail or next step here\n\n"
+        "### Identified Tasks\n"
+        "CRITICAL RULE for Tasks: Write every single task using this exact pattern: '- Task description [Due: predicted calendar date or timeline context]'\n"
+        "Example: '- Dhruvi to review server keys [Due: By Friday]'\n\n"
         f"Source Content Data:\n{combined_text}"
     )
     return call_groq_api(final_prompt)
@@ -186,7 +188,7 @@ def login(data: UserLogin):
 
 
 # =====================================================================
-# CORE DOCUMENT PROCESSING WORKFLOW (WITH SPEAKER TRACKING)
+# CORE DOCUMENT PROCESSING WORKFLOW
 # =====================================================================
 
 @app.post("/api/process")
@@ -213,7 +215,7 @@ async def process_document(
                 final_text = "\n".join(extracted_pages)
                 
                 if not final_text.strip():
-                    raise HTTPException(status_code=400, detail="Processing Error: This PDF file contains no digital text components (scanned image error).")
+                    raise HTTPException(status_code=400, detail="Processing Error: This PDF file contains no digital text components.")
             else:
                 final_text = file_content.decode("utf-8", errors="ignore")
         elif text:
