@@ -8,7 +8,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState('');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
-  const [isDarkMode, setIsDarkMode] = useState(true); // Defaulted to dark mode based on your layout preference
+  const [isDarkMode, setIsDarkMode] = useState(true); 
 
   // Auth Inputs
   const [username, setUsername] = useState('');
@@ -25,6 +25,7 @@ function App() {
   const [summaryOutput, setSummaryOutput] = useState('');
   const [detectedType, setDetectedType] = useState('');
   const [documentTone, setDocumentTone] = useState('');
+  const [speakerDistribution, setSpeakerDistribution] = useState([]); 
   const [stats, setStats] = useState({ compression: 0, timeSaved: 0, speed: 0 });
   const [isProcessing, setIsProcessing] = useState(false);
   const [savedHistory, setSavedHistory] = useState([]);
@@ -38,7 +39,6 @@ function App() {
 
   const BACKEND_URL = 'http://127.0.0.1:8000/api';
 
-  // Fixes browser outer edge margins/whitespace bugs
   useEffect(() => {
     document.body.style.margin = "0";
     document.body.style.padding = "0";
@@ -69,6 +69,7 @@ function App() {
     setSummaryOutput('');
     setDetectedType('');
     setDocumentTone('');
+    setSpeakerDistribution([]);
     setStats({ compression: 0, timeSaved: 0, speed: 0 });
     setChatMessages([]);
     setShowChatroom(false);
@@ -80,7 +81,6 @@ function App() {
     alert('Summary copied to clipboard! 📋');
   };
 
-  // Upgraded High-Fidelity Executive PDF Downloader Engine
   const handleDownloadPDF = () => {
     if (!summaryOutput) return;
     const doc = new jsPDF();
@@ -97,14 +97,12 @@ function App() {
       }
     };
 
-    // Executive Document Title Block
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
     doc.setTextColor(15, 23, 42); 
     doc.text("AI Summary Report", startX, currentY);
     currentY += 6;
 
-    // Elegant Accent Rule Line
     doc.setDrawColor(79, 70, 229); 
     doc.setLineWidth(1.5);
     doc.line(startX, currentY, startX + 50, currentY);
@@ -119,7 +117,6 @@ function App() {
         return;
       }
 
-      // Format Headers cleanly
       if (cleanLine.startsWith('###')) {
         const headingText = cleanLine.replace(/^###\s*/, '');
         checkPageOverflow(14);
@@ -131,7 +128,6 @@ function App() {
         doc.text(headingText, startX, currentY);
         currentY += 8; 
       } 
-      // Format Bullet Points into stylized dots
       else if (cleanLine.startsWith('-')) {
         const bulletText = cleanLine.replace(/^-\s*/, '');
         doc.setFont("helvetica", "normal");
@@ -143,7 +139,6 @@ function App() {
         
         checkPageOverflow(totalHeight);
 
-        // Circular geometric bullet point layout vector
         doc.setFillColor(79, 70, 229); 
         doc.circle(startX + 2, currentY - 3.5, 1, 'F');
 
@@ -153,7 +148,6 @@ function App() {
 
         currentY += totalHeight + 2;
       } 
-      // Format normal narrative paragraphs
       else {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(10.5);
@@ -185,9 +179,7 @@ function App() {
 
   const handleAuthentication = async (e) => {
     e.preventDefault();
-    
     if (isRegisterMode) {
-      // 🔐 Password Security Constraints Check
       const hasNumber = /\d/.test(password);
       const hasSpecial = /[!@#$%^&*(),.?":{}|<>_]/.test(password);
 
@@ -198,7 +190,7 @@ function App() {
         return alert("⚠️ Security Error: Password must contain at least one numerical digit (0-9).");
       }
       if (!hasSpecial) {
-        return alert("⚠️ Security Error: Password must contain at least one special character (e.g. @, #, $, !).");
+        return alert("⚠️ Security Error: Password must contain at least one special character.");
       }
 
       try {
@@ -227,6 +219,7 @@ function App() {
 
     setIsProcessing(true);
     setSummaryOutput('');
+    setSpeakerDistribution([]);
     setShowChatroom(false);
 
     const formData = new FormData();
@@ -248,6 +241,7 @@ function App() {
         setSummaryOutput(data.summary);
         setDetectedType(data.detected_type || 'Text Document');
         setDocumentTone(data.document_tone || 'Professional');
+        setSpeakerDistribution(data.speaker_distribution || []);
         setStats({
           compression: data.compression_ratio || 75,
           timeSaved: data.time_saved_mins || 5,
@@ -299,7 +293,6 @@ function App() {
   return (
     <div style={{...styles.appFrame, backgroundColor: theme.bg, color: theme.text}}>
       
-      {/* Navigation Layout */}
       <nav style={{...styles.navbar, backgroundColor: theme.cardBg, borderColor: theme.border}}>
         <div style={{display:'flex', gap:'16px', alignItems:'center'}}>
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} style={{...styles.secondaryBtn, borderColor: theme.border, color: theme.title}}>
@@ -313,10 +306,8 @@ function App() {
         </div>
       </nav>
 
-      {/* Main Core Viewport Wrapper */}
       <div style={{display: 'flex', flex: 1, width: '100%', overflow: 'hidden'}}>
         
-        {/* Sidebar History Logs */}
         <div style={{...styles.sidebar, width: isSidebarOpen ? '260px' : '0px', backgroundColor: theme.cardBg, borderRightColor: theme.border, opacity: isSidebarOpen ? 1 : 0}}>
           <div style={{padding: '20px'}}>
             {!isLoggedIn ? (
@@ -332,7 +323,7 @@ function App() {
             <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
               {savedHistory.length === 0 ? <p style={{fontSize:'12px', color: theme.subtext, fontStyle:'italic'}}>Sign in to save your history automatically.</p> : null}
               {savedHistory.map((h, i) => (
-                <div key={i} style={{...styles.historyCard, backgroundColor: theme.bg, borderColor: theme.border, color: theme.title}} onClick={() => { setSummaryOutput(h.summary); setDetectedType(h.detected_type); setDocumentTone(h.document_tone); setStats({ compression: h.compression_ratio, timeSaved: h.time_saved_mins, speed: h.velocity }); }}>
+                <div key={i} style={{...styles.historyCard, backgroundColor: theme.bg, borderColor: theme.border, color: theme.title}} onClick={() => { setSummaryOutput(h.summary); setDetectedType(h.detected_type); setDocumentTone(h.document_tone); setSpeakerDistribution(h.speaker_distribution || []); setStats({ compression: h.compression_ratio, timeSaved: h.time_saved_mins, speed: h.velocity }); }}>
                   📄 {h.filename}
                 </div>
               ))}
@@ -340,11 +331,9 @@ function App() {
           </div>
         </div>
 
-        {/* Central Workspace */}
         <div style={styles.mainCanvas}>
           <div style={styles.mainGrid}>
             
-            {/* Control Panel (Left Card) */}
             <div style={{...styles.workspaceCard, backgroundColor: theme.cardBg, borderColor: theme.border}}>
               <div style={{...styles.tabBar, borderBottom: `2px solid ${theme.border}`}}>
                 <button style={{...styles.tabBtn, color: sourceType==='text'? theme.accent : theme.subtext, borderBottom: sourceType==='text'? `3px solid ${theme.accent}` : 'none'}} onClick={() => setSourceType('text')}>Paste Text</button>
@@ -355,9 +344,9 @@ function App() {
                 <textarea style={{...styles.pureTextarea, backgroundColor: theme.inputBg, color: theme.title, borderColor: theme.border}} value={textInput} onChange={e => setTextInput(e.target.value)} placeholder="Paste your transcripts, logs, or raw paragraphs here..." />
               ) : (
                 <div style={{...styles.fileDropArea, backgroundColor: theme.bg, borderColor: theme.border}}>
-                  <input type="file" accept=".pdf,.txt,.log,.mp3,.wav,.m4a" onChange={e => setSelectedFile(e.target.files[0])} style={{display:'none'}} id="file-in" />
+                  <input type="file" accept=".pdf,.txt,.log" onChange={e => setSelectedFile(e.target.files[0])} style={{display:'none'}} id="file-in" />
                   <label htmlFor="file-in" style={{cursor:'pointer', color: theme.title, fontWeight:'600'}}>
-                    {selectedFile ? `📂 Selected: ${selectedFile.name}` : '📥 Click here to select a PDF, Text, or Audio File'}
+                    {selectedFile ? `📂 Selected: ${selectedFile.name}` : '📥 Click here to select a PDF or Text file'}
                   </label>
                 </div>
               )}
@@ -376,7 +365,6 @@ function App() {
               </button>
             </div>
 
-            {/* Results Console Viewport (Right Card) */}
             <div style={{...styles.workspaceCard, backgroundColor: theme.cardBg, borderColor: theme.border}}>
               
               {!showChatroom ? (
@@ -391,12 +379,33 @@ function App() {
                     )}
                   </div>
 
-                  {/* Smart Metrical Stats Counter Layout Badges */}
                   {summaryOutput && !isProcessing && (
                     <div style={{display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap'}}>
                       <span style={styles.badgePill}>⚡ File Reduced By: {stats.compression}%</span>
                       <span style={styles.badgePill}>⏰ Saved: ~{stats.timeSaved} mins reading time</span>
                       <span style={{...styles.badgePill, backgroundColor: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5', borderColor: 'rgba(79, 70, 229, 0.2)'}}>🏷️ {detectedType}</span>
+                    </div>
+                  )}
+
+                  {/* ========================================================== */}
+                  {/* FEATURE DISPLAY: VISUAL SPEAKER TRACKING METERS            */}
+                  {/* ========================================================== */}
+                  {summaryOutput && !isProcessing && speakerDistribution.length > 0 && (
+                    <div style={{ marginBottom: '16px', background: isDarkMode ? '#1e293b' : '#f1f5f9', padding: '12px', borderRadius: '6px', border: `1px solid ${theme.border}` }}>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', color: theme.title, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>👥 Meeting Speaker Contribution:</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {speakerDistribution.map((speaker, index) => (
+                          <div key={index} style={{ fontSize: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', color: theme.text, marginBottom: '2px' }}>
+                              <span>{speaker.name}</span>
+                              <span style={{ fontWeight: 'bold' }}>{speaker.percentage}%</span>
+                            </div>
+                            <div style={{ width: '100%', height: '6px', backgroundColor: isDarkMode ? '#334155' : '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${speaker.percentage}%`, height: '100%', backgroundColor: theme.accent, borderRadius: '3px' }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -420,7 +429,6 @@ function App() {
                   )}
                 </div>
               ) : (
-                /* Interactive Deep Q&A Chatroom Mode */
                 <div style={{display:'flex', flexDirection:'column', flex:1, overflow:'hidden'}}>
                   <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px', borderBottom: `1px solid ${theme.border}`, paddingBottom: '8px'}}>
                     <span style={{color: theme.title, fontWeight:'700'}}>Document AI Q&A Assistant</span>
@@ -450,7 +458,6 @@ function App() {
         </div>
       </div>
 
-      {/* Account Authentication Flow Modal */}
       {showAuthModal && (
         <div style={styles.modalOverlay}>
           <div style={{...styles.modalBox, backgroundColor: theme.cardBg, borderColor: theme.border}}>
@@ -507,7 +514,7 @@ const styles = {
   chatInputText: { flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid', outline: 'none', fontSize: '13px' },
   chatSendButton: { border: 'none', color: '#fff', padding: '0 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize:'12px' },
   
-  spinner: { width:'24px', height:'24px', border:'3px solid rgba(0,0,0,0.1)', borderTop:'3px solid #10b981', borderRadius:'50%', display:'inline-block', animation: 'spin 1s linear infinite' },
+  spinner: { width:'24px', height:'24px', border:'3px solid rgba(0,0,0,0.1)', borderTop:'3px solid #10b981', borderRadius:'50%', display:'inline-block' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
   modalBox: { width: '280px', padding: '20px', borderRadius: '8px', border: '1px solid', display:'flex', flexDirection:'column' },
   modalInput: { padding: '8px', borderRadius: '6px', border: '1px solid', outline: 'none', fontSize: '13px' }
