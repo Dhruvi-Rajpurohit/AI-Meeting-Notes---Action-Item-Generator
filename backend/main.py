@@ -77,8 +77,10 @@ def call_groq_api(prompt_payload: str, json_mode=False):
 def run_ai_document_metadata_pipeline(sample_text: str, current_mode: str):
     snippet = " ".join(sample_text.split()[:1200])
     meta_prompt = (
-        "Analyze this text snippet and return a strict JSON object with three keys: "
-        "'detected_type', 'document_tone', and 'extracted_entities' (max 5 vital items).\n\n"
+        "Analyze this text snippet and return a strict JSON object with five keys: "
+        "'detected_type', 'document_tone', 'extracted_entities' (max 5 vital items), "
+        "'speakers' (an array of names/speaker tags discovered in text), and "
+        "'speaker_distribution' (an array of JSON objects each having 'name' and 'percentage' keys matching text layout proportions).\n\n"
         f"Snippet text:\n{snippet}"
     )
     try:
@@ -87,10 +89,12 @@ def run_ai_document_metadata_pipeline(sample_text: str, current_mode: str):
         return (
             parsed.get("detected_type", "Text Document"),
             parsed.get("document_tone", "Neutral"),
-            parsed.get("extracted_entities", [])
+            parsed.get("extracted_entities", []),
+            parsed.get("speakers", ["Unknown Speaker"]),
+            parsed.get("speaker_distribution", [{"name": "Default Speaker", "percentage": 100}])
         )
     except:
-        return (current_mode if current_mode != "Auto-Detect" else "General Text", "Neutral", [])
+        return (current_mode if current_mode != "Auto-Detect" else "General Text", "Neutral", [], ["Speaker 1"], [{"name": "Speaker 1", "percentage": 100}])
 
 def generate_advanced_summary(text_content: str, processing_mode: str, detected_type: str):
     words = text_content.split()
@@ -132,7 +136,7 @@ def generate_advanced_summary(text_content: str, processing_mode: str, detected_
 
 
 # =====================================================================
-# AUTHENTICATION MODULE (WITH DESCRIPTIVE ERROR STRINGS)
+# AUTHENTICATION MODULE
 # =====================================================================
 
 @app.post("/api/register")
@@ -140,7 +144,6 @@ def register(data: UserRegister):
     username_clean = data.username.strip()
     email_clean = data.email.strip()
     
-    # Validation checks to prevent empty inputs freezing your forms
     if not username_clean:
         raise HTTPException(status_code=400, detail="Validation Error: Username cannot be left empty.")
     if not email_clean or "@" not in email_clean:
@@ -183,7 +186,7 @@ def login(data: UserLogin):
 
 
 # =====================================================================
-# CORE DOCUMENT PROCESSING WORKFLOW
+# CORE DOCUMENT PROCESSING WORKFLOW (WITH SPEAKER TRACKING)
 # =====================================================================
 
 @app.post("/api/process")
@@ -228,6 +231,8 @@ async def process_document(
                 "detected_type": cached_instance.get("detected_type", "Text Document"),
                 "document_tone": cached_instance.get("document_tone", "Neutral"),
                 "extracted_entities": cached_instance.get("extracted_entities", []),
+                "speakers": cached_instance.get("speakers", []),
+                "speaker_distribution": cached_instance.get("speaker_distribution", []),
                 "velocity": cached_instance.get("velocity", 0.05),
                 "compression_ratio": cached_instance.get("compression_ratio", 80),
                 "time_saved_mins": cached_instance.get("time_saved_mins", 3),
@@ -235,7 +240,7 @@ async def process_document(
             }
 
         start_time = time.perf_counter()
-        detected_type, document_tone, extracted_entities = run_ai_document_metadata_pipeline(final_text, processing_mode)
+        detected_type, document_tone, extracted_entities, speakers, speaker_distribution = run_ai_document_metadata_pipeline(final_text, processing_mode)
         ai_response = generate_advanced_summary(final_text, processing_mode, detected_type)
         end_time = time.perf_counter()
         
@@ -249,13 +254,15 @@ async def process_document(
             "owner": username, "filename": filename, "file_hash": payload_hash,
             "processing_mode": processing_mode, "summary": ai_response,
             "detected_type": detected_type, "document_tone": document_tone,
-            "extracted_entities": extracted_entities, "velocity": elapsed_time,
+            "extracted_entities": extracted_entities, "speakers": speakers,
+            "speaker_distribution": speaker_distribution, "velocity": elapsed_time,
             "compression_ratio": compression_ratio, "time_saved_mins": time_saved_mins
         })
 
         return {
             "summary": ai_response, "detected_type": detected_type, "document_tone": document_tone,
-            "extracted_entities": extracted_entities, "velocity": elapsed_time,
+            "extracted_entities": extracted_entities, "speakers": speakers,
+            "speaker_distribution": speaker_distribution, "velocity": elapsed_time,
             "compression_ratio": compression_ratio, "time_saved_mins": time_saved_mins, "cached": False
         }
     except HTTPException as he:
@@ -299,4 +306,4 @@ def get_history(username: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main1.py:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main.py:app", host="127.0.0.1", port=8000, reload=True)
