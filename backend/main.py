@@ -15,7 +15,6 @@ load_dotenv()
 
 app = FastAPI(title="Transcript-to-Summary Backend")
 
-# Ensure complete cross-origin coverage so frontend requests don't freeze silently
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -137,9 +136,6 @@ def generate_advanced_summary(text_content: str, processing_mode: str, detected_
     return call_groq_api(final_prompt)
 
 
-# =====================================================================
-# AUTHENTICATION MODULE
-# =====================================================================
 
 @app.post("/api/register")
 def register(data: UserRegister):
@@ -187,9 +183,6 @@ def login(data: UserLogin):
         raise HTTPException(status_code=500, detail=f"Database Server Connection Drop: {str(e)}")
 
 
-# =====================================================================
-# CORE DOCUMENT PROCESSING WORKFLOW
-# =====================================================================
 
 @app.post("/api/process")
 async def process_document(
@@ -272,10 +265,6 @@ async def process_document(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis pipeline crash details: {str(e)}")
 
-
-# =====================================================================
-# INTERACTIVE CHATBOT ENGINE & HISTORY ROUTING
-# =====================================================================
 
 @app.post("/api/chat")
 def chat_with_summary(payload: ChatRequest):
