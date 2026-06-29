@@ -309,7 +309,7 @@ function App() {
                 display: 'inline-block',
                 verticalAlign: 'middle'
               }}>
-                ⏳ Deadline: {deadlineText}
+                Deadline: {deadlineText}
               </span>
             </li>
           );
